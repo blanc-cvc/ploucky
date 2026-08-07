@@ -9,8 +9,8 @@
   #include "../utils/vedis.h"
 
   typedef struct {
-      vedis *pStore;
-      pthread_mutex_t lock;
+    vedis *pStore;
+    pthread_mutex_t lock;
   } VedisManager;
 
   void _managers_vedis_handle_rc(int rc);
@@ -18,7 +18,9 @@
   int _managers_vedis_close(VedisManager *vedis_manager);
   int _managers_vedis_exec(VedisManager *vedis_manager, char *zCmd, int nLen, const char *as_fmt, ...);
   int _managers_vedis_exec_result(VedisManager *vedis_manager, VedisValue **value);
-
+  #if defined(PLOUCKY_ENABLE_VEDIS_CMD)
+    int _managers_vedis_exec_cmdcli(VedisManager *vedis_manager, const char *cmd);
+  #endif
 
   void vedis_test(VedisManager *vedis_manager);
   

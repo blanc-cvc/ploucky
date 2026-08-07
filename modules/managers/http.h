@@ -7,8 +7,8 @@
   #include "vedis.h" // modules/managers/vedis.h
   
   typedef struct {
-      struct mg_context *ctx;
-      VedisManager *vedis_manager;
+    struct mg_context *ctx;
+    VedisManager *vedis_manager;
   } HttpManager;
   
   int _managers_http_init(HttpManager *http_manager, VedisManager *vedis_manager, const char *port);

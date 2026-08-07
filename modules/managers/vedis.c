@@ -5,12 +5,14 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "../utils/vedis.h"
 #include "../_libs/cjson/cJSON.h"
 #include "../utils/cjson.h"
 #include "../utils/string.h"
 #include "../utils/print.h"
+#include "../utils/array.h"
 
 /*
 // Vedis Datastore Handle
@@ -173,89 +175,151 @@ int _managers_vedis_init(VedisManager *vedis_manager, const char *storage_path) 
 }
 
 int _managers_vedis_close(VedisManager *vedis_manager) {
-    if (!vedis_manager) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_POINTER); return ERR_MANAGERS_VEDIS_CLOSE_POINTER; }
-    if (pthread_mutex_lock(&vedis_manager->lock) != 0) {
-      _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_LOCK);
-      return ERR_MANAGERS_VEDIS_CLOSE_MUTEX_LOCK;
-    }
-    int rc;
-    
-    if (vedis_manager->pStore) {
-        rc = vedis_close(vedis_manager->pStore);
-        vedis_manager->pStore = NULL;
-    }
-    
-    if (rc != VEDIS_OK) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_POINTER_PSTORE); return ERR_MANAGERS_VEDIS_CLOSE_POINTER_PSTORE; }
-    if (pthread_mutex_unlock(&vedis_manager->lock) != 0) {
-      _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_UNLOCK);
-      return ERR_MANAGERS_VEDIS_CLOSE_MUTEX_UNLOCK;
-    }
-    if (pthread_mutex_destroy(&vedis_manager->lock) != 0) {
-      _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_DESTROY);
-      return ERR_MANAGERS_VEDIS_CLOSE_MUTEX_DESTROY;
-    }
-    
-    _globals_app_rc_log(OK_MANAGERS_VEDIS_CLOSE);
-    return OK_MANAGERS_VEDIS_CLOSE;
+  if (!vedis_manager) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_POINTER); return ERR_MANAGERS_VEDIS_CLOSE_POINTER; }
+  if (pthread_mutex_lock(&vedis_manager->lock) != 0) {
+    _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_LOCK);
+    return ERR_MANAGERS_VEDIS_CLOSE_MUTEX_LOCK;
+  }
+  int rc;
+  
+  if (vedis_manager->pStore) {
+    rc = vedis_close(vedis_manager->pStore);
+    vedis_manager->pStore = NULL;
+  }
+  
+  if (rc != VEDIS_OK) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_POINTER_PSTORE); return ERR_MANAGERS_VEDIS_CLOSE_POINTER_PSTORE; }
+  if (pthread_mutex_unlock(&vedis_manager->lock) != 0) {
+    _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_UNLOCK);
+    return ERR_MANAGERS_VEDIS_CLOSE_MUTEX_UNLOCK;
+  }
+  if (pthread_mutex_destroy(&vedis_manager->lock) != 0) {
+    _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_DESTROY);
+    return ERR_MANAGERS_VEDIS_CLOSE_MUTEX_DESTROY;
+  }
+  
+  _globals_app_rc_log(OK_MANAGERS_VEDIS_CLOSE);
+  return OK_MANAGERS_VEDIS_CLOSE;
 }
 
 int _managers_vedis_exec(VedisManager *vedis_manager, char *zCmd, int nLen, const char *as_fmt, ...) {
-    if (stop_requested || restart_requested) { return OK_MANAGERS_RESTART_STOP_RETRY; }
-    if (!vedis_manager || !vedis_manager->pStore) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_POINTER); _managers_vedis_handle_rc(ERR_MANAGERS_VEDIS_EXEC_POINTER); return ERR_MANAGERS_VEDIS_EXEC_POINTER; }
-    if (!zCmd) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_CMD); return ERR_MANAGERS_VEDIS_EXEC_CMD; }
-    if (pthread_mutex_lock(&vedis_manager->lock) != 0) {
-      _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_MUTEX_LOCK);
-      _managers_vedis_handle_rc(ERR_MANAGERS_VEDIS_EXEC_MUTEX_LOCK);
-      return ERR_MANAGERS_VEDIS_EXEC_MUTEX_LOCK;
-    }
-    int rc;
-    char *zCmdFmt;
-    
-    if (as_fmt) {
-      va_list args;
-      va_start(args, as_fmt);
-      zCmdFmt = _utils_string_vaprintf_to_string(zCmd, args);
-      va_end(args);
-      if (!zCmdFmt) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_CMD_FMT); return ERR_MANAGERS_VEDIS_EXEC_CMD_FMT; }
-    }
-    
-    rc = vedis_exec(vedis_manager->pStore, as_fmt ? zCmdFmt : zCmd, nLen ? nLen : -1);
-    if (as_fmt) { free(zCmdFmt); }
-    
-    if (rc != VEDIS_OK) { _managers_vedis_handle_rc(rc); }
-    //_managers_vedis_handle_rc(rc);
-    if (pthread_mutex_unlock(&vedis_manager->lock) != 0) {
-      _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_MUTEX_UNLOCK);
-      _managers_vedis_handle_rc(ERR_MANAGERS_VEDIS_EXEC_MUTEX_UNLOCK);
-      return ERR_MANAGERS_VEDIS_EXEC_MUTEX_UNLOCK;
-    }
-    return rc; // keep vedis rc
+  if (stop_requested || restart_requested) { return OK_MANAGERS_RESTART_STOP_RETRY; }
+  if (!vedis_manager || !vedis_manager->pStore) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_POINTER); _managers_vedis_handle_rc(ERR_MANAGERS_VEDIS_EXEC_POINTER); return ERR_MANAGERS_VEDIS_EXEC_POINTER; }
+  if (!zCmd) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_CMD); return ERR_MANAGERS_VEDIS_EXEC_CMD; }
+  if (pthread_mutex_lock(&vedis_manager->lock) != 0) {
+    _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_MUTEX_LOCK);
+    _managers_vedis_handle_rc(ERR_MANAGERS_VEDIS_EXEC_MUTEX_LOCK);
+    return ERR_MANAGERS_VEDIS_EXEC_MUTEX_LOCK;
+  }
+  int rc;
+  char *zCmdFmt;
+  
+  if (as_fmt) {
+    va_list args;
+    va_start(args, as_fmt);
+    zCmdFmt = _utils_string_vaprintf_to_string(zCmd, args);
+    va_end(args);
+    if (!zCmdFmt) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_CMD_FMT); return ERR_MANAGERS_VEDIS_EXEC_CMD_FMT; }
+  }
+  
+  rc = vedis_exec(vedis_manager->pStore, as_fmt ? zCmdFmt : zCmd, nLen ? nLen : -1);
+  if (as_fmt) { free(zCmdFmt); }
+  
+  if (rc != VEDIS_OK) { _managers_vedis_handle_rc(rc); }
+  //_managers_vedis_handle_rc(rc);
+  if (pthread_mutex_unlock(&vedis_manager->lock) != 0) {
+    _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_MUTEX_UNLOCK);
+    _managers_vedis_handle_rc(ERR_MANAGERS_VEDIS_EXEC_MUTEX_UNLOCK);
+    return ERR_MANAGERS_VEDIS_EXEC_MUTEX_UNLOCK;
+  }
+  return rc; // keep vedis rc
 }
 
 int _managers_vedis_exec_result(VedisManager *vedis_manager, VedisValue **value) {
-    if (stop_requested || restart_requested) { return OK_MANAGERS_RESTART_STOP_RETRY; }
-    if (!vedis_manager || !vedis_manager->pStore) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_RESULT_POINTER); _managers_vedis_handle_rc(ERR_MANAGERS_VEDIS_EXEC_RESULT_POINTER); return ERR_MANAGERS_VEDIS_EXEC_RESULT_POINTER; }
-    if (pthread_mutex_lock(&vedis_manager->lock) != 0) {
-      _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_RESULT_MUTEX_LOCK);
-      _managers_vedis_handle_rc(ERR_MANAGERS_VEDIS_EXEC_RESULT_MUTEX_LOCK);
-      return ERR_MANAGERS_VEDIS_EXEC_RESULT_MUTEX_LOCK;
-    }
-    
-    vedis_value *pResult;
-    int rc = vedis_exec_result(vedis_manager->pStore, &pResult);
-    if (rc == VEDIS_OK) {
-      *value = _utils_vedis_parse_value(pResult);
-    }
-    
-    if (rc != VEDIS_OK) { _managers_vedis_handle_rc(rc); }
-    //_managers_vedis_handle_rc(rc);
-    if (pthread_mutex_unlock(&vedis_manager->lock) != 0) {
-      _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_RESULT_MUTEX_UNLOCK);
-      _managers_vedis_handle_rc(ERR_MANAGERS_VEDIS_EXEC_RESULT_MUTEX_UNLOCK);
-      return ERR_MANAGERS_VEDIS_EXEC_RESULT_MUTEX_UNLOCK;
-    }
-    return rc; // keep vedis rc
+  if (stop_requested || restart_requested) { return OK_MANAGERS_RESTART_STOP_RETRY; }
+  if (!vedis_manager || !vedis_manager->pStore) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_RESULT_POINTER); _managers_vedis_handle_rc(ERR_MANAGERS_VEDIS_EXEC_RESULT_POINTER); return ERR_MANAGERS_VEDIS_EXEC_RESULT_POINTER; }
+  if (pthread_mutex_lock(&vedis_manager->lock) != 0) {
+    _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_RESULT_MUTEX_LOCK);
+    _managers_vedis_handle_rc(ERR_MANAGERS_VEDIS_EXEC_RESULT_MUTEX_LOCK);
+    return ERR_MANAGERS_VEDIS_EXEC_RESULT_MUTEX_LOCK;
+  }
+  
+  vedis_value *pResult;
+  int rc = vedis_exec_result(vedis_manager->pStore, &pResult);
+  if (rc == VEDIS_OK) {
+    *value = _utils_vedis_parse_value(pResult);
+  }
+  
+  if (rc != VEDIS_OK) { _managers_vedis_handle_rc(rc); }
+  //_managers_vedis_handle_rc(rc);
+  if (pthread_mutex_unlock(&vedis_manager->lock) != 0) {
+    _globals_app_rc_log(ERR_MANAGERS_VEDIS_EXEC_RESULT_MUTEX_UNLOCK);
+    _managers_vedis_handle_rc(ERR_MANAGERS_VEDIS_EXEC_RESULT_MUTEX_UNLOCK);
+    return ERR_MANAGERS_VEDIS_EXEC_RESULT_MUTEX_UNLOCK;
+  }
+  return rc; // keep vedis rc
 }
+
+#if defined(PLOUCKY_ENABLE_VEDIS_CMD)
+  int _managers_vedis_exec_cmdcli(VedisManager *vedis_manager, const char *cmd) {
+    char *buffer = strdup(cmd);
+    if (!buffer) return -1;
+    int rc;
+
+    _utils_string_remove_start(buffer, strlen("/vedis "));
+    int has_char_count = _utils_string_has_char(buffer, ',');
+    
+    char *array_cmd[has_char_count + 1]; 
+
+    if (has_char_count > 0) { // UNUSED
+      char *str = strdup(buffer);
+      if (!str) { free(buffer); return -1; }
+
+      char *token;
+      int count = 0;
+      token = strtok(str, ",");
+      
+      while (token != NULL && count <= has_char_count) {
+        array_cmd[count] = _utils_string_trim(strdup(token)); 
+        
+        if (array_cmd[count]) { count++; }
+        token = strtok(NULL, ",");
+      }
+      free(str);
+
+      for (int i = 0; i < count; i++) {
+        _utils_printf(NULL, "vedis cmd [%d]: %s\n", i, array_cmd[i]);
+        // vedis exec _utils_array_to_params_buffer
+      }
+      
+      char buffer[1024];
+      _utils_printf(NULL, "%s\n", _utils_array_to_stringbuffer(array_cmd, count, buffer, sizeof(buffer), 0, 0));
+      cJSON *json_string_parsed = cJSON_Parse(_utils_array_to_stringbuffer(array_cmd, count, buffer, sizeof(buffer), 0, 0));
+      char *json_print_parsed = cJSON_PrintUnformatted(json_string_parsed);
+      _utils_printf(NULL, " -> array print %s\n", json_print_parsed);
+      cJSON_Delete(json_string_parsed);
+      free(json_print_parsed);
+    
+      for (int i = 0; i < count; i++) {
+        free(array_cmd[i]);
+      }
+    } else {
+      rc = _managers_vedis_exec(vedis_manager, buffer, -1, NULL);
+      if (rc == VEDIS_OK) {
+        VedisValue *value;
+        rc = _managers_vedis_exec_result(vedis_manager, &value);
+        if (rc == VEDIS_OK) {
+          if (_utils_vedis_parse_value_isok(value)) {
+            _utils_vedis_print_value(value);
+            _utils_vedis_value_destroy(value);
+          }
+        }
+      }
+    }
+    
+    free(buffer);
+    return 0;
+  }
+#endif
 
 void vedis_test(VedisManager *vedis_manager) {
   int rc;
@@ -381,19 +445,5 @@ void vedis_test(VedisManager *vedis_manager) {
   free(json_print_user);
   free(json_print_user_profile);
   
-
-
   //https://vedis.symisc.net/commands.html
-  //printf("\n\n VEDIS CMD_LIST:\n");
-  //vedis_exec(pStore,"CMD_LIST",-1);
-  //vedis_exec_result(pStore,&pResult);
-  //value = _utils_vedis_parse_value(pResult);
-  //if (_utils_vedis_parse_value_isok(value)) {
-  //  _utils_vedis_print_value(value);
-  //  _utils_vedis_value_destroy(value);
-  //}
-  //_utils_printf(NULL, "\n\nVedis Version: %s\n\n", vedis_lib_version());
-  /* Finally, auto-commit the transaction and close our datastore */
-  //vedis_close(pStore);
-  _utils_printf(NULL, "\n");
 }

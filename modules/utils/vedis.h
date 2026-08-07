@@ -9,25 +9,25 @@
   const char *_utils_vedis_valuetype_to_str(int type);
 
   typedef enum {
-      TYPE_ARRAY,
-      TYPE_BOOL,
-      TYPE_INT,
-      TYPE_FLOAT,
-      TYPE_JSON,
-      TYPE_STRING,
+    TYPE_ARRAY,
+    TYPE_BOOL,
+    TYPE_INT,
+    TYPE_FLOAT,
+    TYPE_JSON,
+    TYPE_STRING
   } VedisType;
 
   struct VedisValue;
 
   typedef struct VedisValue {
-      VedisType type;
-      int _int;
-      int _bool;
-      double _double;
-      char *_string_ptr;
-      int _string_len;
-      struct VedisValue **_array_ptr;
-      int _array_len;
+    VedisType type;
+    int _int;
+    int _bool;
+    double _double;
+    char *_string_ptr;
+    int _string_len;
+    struct VedisValue **_array_ptr;
+    int _array_len;
   } VedisValue;
 
   void _utils_vedis_value_destroy(VedisValue *value);

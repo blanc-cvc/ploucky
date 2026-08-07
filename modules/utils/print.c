@@ -35,8 +35,13 @@ void _utils_printf(const char *err, const char* string, ...) {
   if (linenoise_state.ofd != 0) { linenoiseHide(&linenoise_state); }
   va_list args;
   va_start(args, string);
-  if (err) { vfprintf(stderr, string, args); fflush(stderr); }
-  else { vprintf(string, args); fflush(stdout); }
+  if (err) {
+    fprintf(stderr, "%s", TERMINAL_STYLE_RED);
+    vfprintf(stderr, string, args); fflush(stderr);
+    fprintf(stderr, "%s", TERMINAL_STYLE_RESET);
+  } else {
+    vprintf(string, args); fflush(stdout);
+  }
   va_end(args);
   if (linenoise_state.ofd != 0) { linenoiseShow(&linenoise_state); }
 }
