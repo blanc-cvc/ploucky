@@ -8,10 +8,10 @@
   
   typedef struct {
     struct mg_context *ctx;
-    VedisManager *vedis_manager;
+    VedisManagers *vedis_managers;
   } HttpManager;
   
-  int _managers_http_init(HttpManager *http_manager, VedisManager *vedis_manager, const char *port);
+  int _managers_http_init(HttpManager *http_manager, VedisManagers *vedis_managers, const char *port);
   int _managers_http_close(HttpManager *http_manager);
   
   #if defined(MG_EXPERIMENTAL_INTERFACES) && defined(USE_SERVER_STATS)

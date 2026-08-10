@@ -90,7 +90,7 @@ static int request_handler(struct mg_connection *conn, void *cb_data) {
     if (stop_requested || restart_requested) { _globals_app_rc_log(OK_MANAGERS_RESTART_STOP_RETRY); return OK_MANAGERS_RESTART_STOP_RETRY; }
     HttpManager *http_manager = (HttpManager *)cb_data;
         
-    if (!http_manager || !http_manager->vedis_manager) {
+    if (!http_manager || !http_manager->vedis_managers) {
       send_http_response(conn, _utils_int_get_random(400, 500), "text/plain", "Error", 5);
       _globals_app_rc_log(ERR_MANAGERS_HTTP_REQUEST_VEDIS_POINTER); return ERR_MANAGERS_HTTP_REQUEST_VEDIS_POINTER;
     }
@@ -109,14 +109,14 @@ static int request_handler(struct mg_connection *conn, void *cb_data) {
       send_http_response(conn, 200, "text/plain", msg_chunk_test, -1);
     } else if (strcmp(req_info->local_uri, "/vedis") == 0) {  // GET CMD_LIST from VEDIS
       int rc;
-      rc = _managers_vedis_exec(http_manager->vedis_manager, "CMD_LIST", -1, NULL);
+      rc = _managers_vedis_exec(_managers_vedis_manager_get(http_manager->vedis_managers, "memory"), "CMD_LIST", -1, NULL);
       if (rc != VEDIS_OK) {
         send_http_response(conn, _utils_int_get_random(400, 500), "text/plain", "Error", 5);
         _utils_vedis_rc_log(rc); return rc;
       }
       
       VedisValue *value;
-      rc = _managers_vedis_exec_result(http_manager->vedis_manager, &value);
+      rc = _managers_vedis_exec_result(_managers_vedis_manager_get(http_manager->vedis_managers, "memory"), &value);
       if (rc != VEDIS_OK) {
         send_http_response(conn, _utils_int_get_random(400, 500), "text/plain", "Error", 5);
         _utils_vedis_rc_log(rc); return rc;
@@ -144,14 +144,14 @@ static int request_handler(struct mg_connection *conn, void *cb_data) {
 
 
 // PUBLIC FUNCTIONS
-int _managers_http_init(HttpManager *http_manager, VedisManager *vedis_manager, const char *port) {
+int _managers_http_init(HttpManager *http_manager, VedisManagers *vedis_managers, const char *port) {
   if (stop_requested || restart_requested) { _globals_app_rc_log(OK_MANAGERS_RESTART_STOP_RETRY); return OK_MANAGERS_RESTART_STOP_RETRY; }
-  if (!http_manager || !vedis_manager) { _globals_app_rc_log(ERR_MANAGERS_HTTP_INIT_POINTER); return ERR_MANAGERS_HTTP_INIT_POINTER; } // || or port is not between valid range
+  if (!http_manager || !vedis_managers) { _globals_app_rc_log(ERR_MANAGERS_HTTP_INIT_POINTER); return ERR_MANAGERS_HTTP_INIT_POINTER; } // || or port is not between valid range
   // as cbdata: http_manager containing vedis_manager
   // cbdata: the callback data to give to the handler when it is called.
   
-  http_manager->ctx = NULL;
-  http_manager->vedis_manager = vedis_manager;
+  if (http_manager->vedis_managers) { return -1; } // _managers_http_init already done
+  http_manager->vedis_managers = vedis_managers;
 
   const char *options[] = { "listening_ports", port, NULL };
 

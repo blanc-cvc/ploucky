@@ -155,47 +155,72 @@ void _managers_vedis_handle_rc(int rc) {
   }
 }
 
-int _managers_vedis_init(VedisManager *vedis_manager, const char *storage_path) {
-  if (!vedis_manager) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_INIT_POINTER); return ERR_MANAGERS_VEDIS_INIT_POINTER; }
+VedisManager *_managers_vedis_manager_get(VedisManagers *vedis_managers, const char *name) {
+  for (int i = 0; i < vedis_managers->count; i++) {
+    if (strcmp(vedis_managers->managers[i].name, name) == 0) {
+      return &vedis_managers->managers[i];
+    }
+  }
+  return NULL;
+}
+
+int _managers_vedis_store_add(VedisManagers *vedis_managers, const char *storage_path, char *name) {
+  if (!vedis_managers) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_INIT_POINTER); return ERR_MANAGERS_VEDIS_INIT_POINTER; } // change/add code
   
-  if (pthread_mutex_init(&vedis_manager->lock, NULL) != 0) {
+  VedisManager *new_vedis_manager = &vedis_managers->managers[vedis_managers->count];
+  
+  if (pthread_mutex_init(&new_vedis_manager->lock, NULL) != 0) {
     _globals_app_rc_log(ERR_MANAGERS_VEDIS_INIT_MUTEX);
     return ERR_MANAGERS_VEDIS_INIT_MUTEX;
   }
   
-  int rc = vedis_open(&vedis_manager->pStore, storage_path ? storage_path : ":mem:");
+  int rc = vedis_open(&new_vedis_manager->pStore, storage_path ? storage_path : ":mem:");
   if (rc != VEDIS_OK) {
       _globals_app_rc_log(ERR_MANAGERS_VEDIS_INIT_OPEN);
-      pthread_mutex_destroy(&vedis_manager->lock);
+      pthread_mutex_destroy(&new_vedis_manager->lock);
       return ERR_MANAGERS_VEDIS_INIT_OPEN;
   }
+  
+  new_vedis_manager->name = name;
+  vedis_managers->count++;
   
   _globals_app_rc_log(OK_MANAGERS_VEDIS_INIT);
   return OK_MANAGERS_VEDIS_INIT;
 }
 
-int _managers_vedis_close(VedisManager *vedis_manager) {
-  if (!vedis_manager) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_POINTER); return ERR_MANAGERS_VEDIS_CLOSE_POINTER; }
-  if (pthread_mutex_lock(&vedis_manager->lock) != 0) {
-    _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_LOCK);
-    return ERR_MANAGERS_VEDIS_CLOSE_MUTEX_LOCK;
-  }
-  int rc;
+int _managers_vedis_close(VedisManagers *vedis_managers) {
+  if (!vedis_managers) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_POINTER); return ERR_MANAGERS_VEDIS_CLOSE_POINTER; }
   
-  if (vedis_manager->pStore) {
-    rc = vedis_close(vedis_manager->pStore);
-    vedis_manager->pStore = NULL;
+  for (int index = vedis_managers->count-1; index >= 0; index--) {
+  
+    VedisManager *current_vedis_manager = &vedis_managers->managers[index];
+    
+    _utils_printf(NULL, "VEDIS MANAGER CLOSE: %s\n", current_vedis_manager->name);
+    
+    if (pthread_mutex_lock(&current_vedis_manager->lock) != 0) {
+      _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_LOCK);
+      return ERR_MANAGERS_VEDIS_CLOSE_MUTEX_LOCK;
+    }
+    int rc;
+    
+    if (current_vedis_manager->pStore) {
+      rc = vedis_close(current_vedis_manager->pStore);
+      current_vedis_manager->pStore = NULL;
+    }
+    
+    if (rc != VEDIS_OK) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_POINTER_PSTORE); return ERR_MANAGERS_VEDIS_CLOSE_POINTER_PSTORE; }
+    if (pthread_mutex_unlock(&current_vedis_manager->lock) != 0) {
+      _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_UNLOCK);
+      return ERR_MANAGERS_VEDIS_CLOSE_MUTEX_UNLOCK;
+    }
+    if (pthread_mutex_destroy(&current_vedis_manager->lock) != 0) {
+      _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_DESTROY);
+      return ERR_MANAGERS_VEDIS_CLOSE_MUTEX_DESTROY;
+    }
+    
   }
   
-  if (rc != VEDIS_OK) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_POINTER_PSTORE); return ERR_MANAGERS_VEDIS_CLOSE_POINTER_PSTORE; }
-  if (pthread_mutex_unlock(&vedis_manager->lock) != 0) {
-    _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_UNLOCK);
-    return ERR_MANAGERS_VEDIS_CLOSE_MUTEX_UNLOCK;
-  }
-  if (pthread_mutex_destroy(&vedis_manager->lock) != 0) {
-    _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_DESTROY);
-    return ERR_MANAGERS_VEDIS_CLOSE_MUTEX_DESTROY;
-  }
+  free(vedis_managers->managers);
   
   _globals_app_rc_log(OK_MANAGERS_VEDIS_CLOSE);
   return OK_MANAGERS_VEDIS_CLOSE;
@@ -260,58 +285,73 @@ int _managers_vedis_exec_result(VedisManager *vedis_manager, VedisValue **value)
 }
 
 #if defined(PLOUCKY_ENABLE_VEDIS_CMD)
-  int _managers_vedis_exec_cmdcli(VedisManager *vedis_manager, const char *cmd) {
+  int _managers_vedis_exec_cmdcli(VedisManagers *vedis_managers, char *cmd) {
     char *buffer = strdup(cmd);
     if (!buffer) return -1;
     int rc;
-
-    _utils_string_remove_start(buffer, strlen("/vedis "));
-    int has_char_count = _utils_string_has_char(buffer, ',');
     
+    _utils_string_remove_start(buffer, strlen("/vedis "));
+    VedisManager *vedis_manager;
+    int has_char_count = _utils_string_has_char(cmd, ':');
     char *array_cmd[has_char_count + 1]; 
 
     if (has_char_count > 0) { // UNUSED
       char *str = strdup(buffer);
       if (!str) { free(buffer); return -1; }
-
+      
       char *token;
       int count = 0;
-      token = strtok(str, ",");
+      token = strtok(str, ":");
       
       while (token != NULL && count <= has_char_count) {
         array_cmd[count] = _utils_string_trim(strdup(token)); 
         
         if (array_cmd[count]) { count++; }
-        token = strtok(NULL, ",");
+        token = strtok(NULL, ":");
       }
       free(str);
 
+      /*
       for (int i = 0; i < count; i++) {
         _utils_printf(NULL, "vedis cmd [%d]: %s\n", i, array_cmd[i]);
-        // vedis exec _utils_array_to_params_buffer
+      }
+      */
+      
+      vedis_manager = _managers_vedis_manager_get(vedis_managers, _utils_string_trim(array_cmd[0]));
+      if (vedis_manager) {
+        _utils_string_remove_start(buffer, strlen(array_cmd[0])+1);
+        /*
+        char buffer[1024];
+        _utils_printf(NULL, "%s\n", _utils_array_to_stringbuffer(array_cmd, count, buffer, sizeof(buffer), 0, 0));
+        cJSON *json_string_parsed = cJSON_Parse(_utils_array_to_stringbuffer(array_cmd, count, buffer, sizeof(buffer), 0, 0));
+        char *json_print_parsed = cJSON_PrintUnformatted(json_string_parsed);
+        _utils_printf(NULL, " -> array print %s\n", json_print_parsed);
+        cJSON_Delete(json_string_parsed);
+        free(json_print_parsed);
+        */
       }
       
-      char buffer[1024];
-      _utils_printf(NULL, "%s\n", _utils_array_to_stringbuffer(array_cmd, count, buffer, sizeof(buffer), 0, 0));
-      cJSON *json_string_parsed = cJSON_Parse(_utils_array_to_stringbuffer(array_cmd, count, buffer, sizeof(buffer), 0, 0));
-      char *json_print_parsed = cJSON_PrintUnformatted(json_string_parsed);
-      _utils_printf(NULL, " -> array print %s\n", json_print_parsed);
-      cJSON_Delete(json_string_parsed);
-      free(json_print_parsed);
-    
       for (int i = 0; i < count; i++) {
         free(array_cmd[i]);
       }
+      
+      if (!vedis_manager) {
+        _utils_printf(NULL, "Unknown VEDIS DB: %s\n", array_cmd[0]);
+        free(buffer);
+        return -1;
+      }
     } else {
-      rc = _managers_vedis_exec(vedis_manager, buffer, -1, NULL);
+      vedis_manager = &vedis_managers->managers[0];
+    }
+    
+    rc = _managers_vedis_exec(vedis_manager, _utils_string_trim(buffer), -1, NULL);
+    if (rc == VEDIS_OK) {
+      VedisValue *value;
+      rc = _managers_vedis_exec_result(vedis_manager, &value);
       if (rc == VEDIS_OK) {
-        VedisValue *value;
-        rc = _managers_vedis_exec_result(vedis_manager, &value);
-        if (rc == VEDIS_OK) {
-          if (_utils_vedis_parse_value_isok(value)) {
-            _utils_vedis_print_value(value);
-            _utils_vedis_value_destroy(value);
-          }
+        if (_utils_vedis_parse_value_isok(value)) {
+          _utils_vedis_print_value(value);
+          _utils_vedis_value_destroy(value);
         }
       }
     }
@@ -321,8 +361,10 @@ int _managers_vedis_exec_result(VedisManager *vedis_manager, VedisValue **value)
   }
 #endif
 
-void vedis_test(VedisManager *vedis_manager) {
+void vedis_test(VedisManagers *vedis_managers) {
   int rc;
+  
+  VedisManager *vedis_manager = _managers_vedis_manager_get(vedis_managers, "memory");
   
   _utils_printf(NULL, "1. Test INT:\n");
   _managers_vedis_exec(vedis_manager, "SET my_int 42", -1, NULL);
