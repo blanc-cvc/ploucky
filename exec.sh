@@ -7,6 +7,7 @@ APPNAME=$(basename "$(pwd)")
 CASE=""
 COMPILER="gcc"
 LIBLINK="-lpthread -ldl -lm"
+DEBUG="-g -O0"
 
 
 while [[ $# -gt 0 ]]; do
@@ -25,6 +26,7 @@ while [[ $# -gt 0 ]]; do
             CASE="build"
             COMPILER="musl-gcc"
             LIBLINK="${LIBLINK} -static"
+            DEBUG=""
             shift
             break
             ;;
@@ -73,10 +75,11 @@ else
 fi
 
 CONFORMING="-std=c99 -D_POSIX_C_SOURCE=200809L"
-$COMPILER -pedantic $CONFORMING ${DEFINES[@]} -o $APPNAME main.c $MODULES $LIBLINK
+$COMPILER $DEBUG -pedantic $CONFORMING ${DEFINES[@]} -o $APPNAME main.c $MODULES $LIBLINK
 
 if [ "$CASE" == "valgrind" ]; then
-  valgrind --leak-check=full ./$APPNAME "$@" && rm ./$APPNAME
+  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$APPNAME "$@" && rm ./$APPNAME
+  #--malloc-fill=0xAA --free-fill=0xBB --log-file=valgrind.log  --show-leak-kinds=all --track-origins=yes --num-callers=40 --verbose 
 elif [ "$CASE" == "run" ]; then
   ./$APPNAME "$@"
   if [ -f "$APPNAME" ]; then

@@ -6,6 +6,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+  #include <direct.h>
+#else
+  #include <sys/types.h>
+  #include <sys/stat.h>
+#endif
 
 #include "../utils/vedis.h"
 #include "../_libs/cjson/cJSON.h"
@@ -164,7 +170,15 @@ VedisManager *_managers_vedis_manager_get(VedisManagers *vedis_managers, const c
   return NULL;
 }
 
-int _managers_vedis_store_add(VedisManagers *vedis_managers, const char *storage_path, char *name) {
+int _managers_vedis_list(VedisManagers *vedis_managers) {
+  _utils_printf(NULL, "VEDIS DB:\n");
+  for (int i = 0; i < vedis_managers->count; i++) {
+    _utils_printf(NULL, "  %d: %s\n", i, vedis_managers->managers[i].name);
+  }
+  return VEDIS_OK;
+}
+
+int _managers_vedis_store_add(VedisManagers *vedis_managers, const char *storage_path, const char *name) {
   if (!vedis_managers) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_INIT_POINTER); return ERR_MANAGERS_VEDIS_INIT_POINTER; } // change/add code
   
   VedisManager *new_vedis_manager = &vedis_managers->managers[vedis_managers->count];
@@ -174,7 +188,64 @@ int _managers_vedis_store_add(VedisManagers *vedis_managers, const char *storage
     return ERR_MANAGERS_VEDIS_INIT_MUTEX;
   }
   
-  int rc = vedis_open(&new_vedis_manager->pStore, storage_path ? storage_path : ":mem:");
+  int rc;
+  
+  if (storage_path && storage_path != ":mem:") {
+    char buffer[512];
+    int has_char_count = _utils_string_has_char(storage_path, '/');
+    char *array_storage_path[has_char_count + 1];
+    int array_storage_path_len = 0;
+    
+    if (has_char_count > 0) {
+      char *str = strdup(storage_path);
+      if (!str) { 
+        for (int i = 0; i < has_char_count + 1; i++) {
+          free(array_storage_path[i]);
+        }
+        return -1;
+      }
+      
+      char *token = strtok(str, "/");
+      
+      while (token != NULL && array_storage_path_len <= has_char_count) {
+        array_storage_path[array_storage_path_len] = strdup(token); 
+        
+        if (array_storage_path[array_storage_path_len]) { array_storage_path_len++; }
+        token = strtok(NULL, "/");
+      }
+      free(str);
+      
+      for (int i = 0; i < array_storage_path_len; i++) {
+        if (strncmp(array_storage_path[i], "$", 1) == 0) {
+          char *env = getenv(_utils_string_remove_start(array_storage_path[i], 1));
+          if (env) {
+            free(array_storage_path[i]);
+            array_storage_path[i] = strdup(env);
+          }
+        }
+      }
+      
+      for (int i = array_storage_path_len-1; i >= 1; i--) {
+        _utils_array_to_stringbuffer(array_storage_path, array_storage_path_len-i, buffer, sizeof(buffer), 0, 0, "/");
+        #ifdef _WIN32
+          _mkdir(buffer);
+        #else
+          mkdir(buffer, 0755);
+        #endif
+      }
+      
+      _utils_printf(NULL, "VEDIS MANAGER OPEN: %s -> %s\n", name, _utils_array_to_stringbuffer(array_storage_path, array_storage_path_len, buffer, sizeof(buffer), 0, 0, "/"));
+      rc = vedis_open(&new_vedis_manager->pStore, buffer);
+    }
+    
+    for (int i = 0; i < array_storage_path_len; i++) {
+      free(array_storage_path[i]);
+    }
+  } else {
+    _utils_printf(NULL, "VEDIS MANAGER OPEN: %s -> %s\n", name, ":mem:");
+    rc = vedis_open(&new_vedis_manager->pStore, ":mem:");
+  }
+  
   if (rc != VEDIS_OK) {
       _globals_app_rc_log(ERR_MANAGERS_VEDIS_INIT_OPEN);
       pthread_mutex_destroy(&new_vedis_manager->lock);
@@ -182,6 +253,7 @@ int _managers_vedis_store_add(VedisManagers *vedis_managers, const char *storage
   }
   
   new_vedis_manager->name = name;
+  new_vedis_manager->path = storage_path ? storage_path : ":mem:";
   vedis_managers->count++;
   
   _globals_app_rc_log(OK_MANAGERS_VEDIS_INIT);
@@ -195,7 +267,7 @@ int _managers_vedis_close(VedisManagers *vedis_managers) {
   
     VedisManager *current_vedis_manager = &vedis_managers->managers[index];
     
-    _utils_printf(NULL, "VEDIS MANAGER CLOSE: %s\n", current_vedis_manager->name);
+    _utils_printf(NULL, "VEDIS MANAGER CLOSE: %s -> %s\n", current_vedis_manager->name, current_vedis_manager->path);
     
     if (pthread_mutex_lock(&current_vedis_manager->lock) != 0) {
       _globals_app_rc_log(ERR_MANAGERS_VEDIS_CLOSE_MUTEX_LOCK);
@@ -285,79 +357,76 @@ int _managers_vedis_exec_result(VedisManager *vedis_manager, VedisValue **value)
 }
 
 #if defined(PLOUCKY_ENABLE_VEDIS_CMD)
-  int _managers_vedis_exec_cmdcli(VedisManagers *vedis_managers, char *cmd) {
+  int _managers_vedis_exec_cmdcli(VedisManagers *vedis_managers, const char *cmd) {
     char *buffer = strdup(cmd);
-    if (!buffer) return -1;
+    if (!buffer) { return -1; }
     int rc;
     
     _utils_string_remove_start(buffer, strlen("/vedis "));
-    VedisManager *vedis_manager;
+    VedisManager *vedis_manager = NULL;
     int has_char_count = _utils_string_has_char(cmd, ':');
-    char *array_cmd[has_char_count + 1]; 
-
-    if (has_char_count > 0) { // UNUSED
+    char *array_cmd[has_char_count + 1];
+    int array_cmd_len = 0;
+    
+    if (has_char_count > 0) {
       char *str = strdup(buffer);
-      if (!str) { free(buffer); return -1; }
-      
-      char *token;
-      int count = 0;
-      token = strtok(str, ":");
-      
-      while (token != NULL && count <= has_char_count) {
-        array_cmd[count] = _utils_string_trim(strdup(token)); 
-        
-        if (array_cmd[count]) { count++; }
-        token = strtok(NULL, ":");
-      }
-      free(str);
-
-      /*
-      for (int i = 0; i < count; i++) {
-        _utils_printf(NULL, "vedis cmd [%d]: %s\n", i, array_cmd[i]);
-      }
-      */
-      
-      vedis_manager = _managers_vedis_manager_get(vedis_managers, _utils_string_trim(array_cmd[0]));
-      if (vedis_manager) {
-        _utils_string_remove_start(buffer, strlen(array_cmd[0])+1);
-        /*
-        char buffer[1024];
-        _utils_printf(NULL, "%s\n", _utils_array_to_stringbuffer(array_cmd, count, buffer, sizeof(buffer), 0, 0));
-        cJSON *json_string_parsed = cJSON_Parse(_utils_array_to_stringbuffer(array_cmd, count, buffer, sizeof(buffer), 0, 0));
-        char *json_print_parsed = cJSON_PrintUnformatted(json_string_parsed);
-        _utils_printf(NULL, " -> array print %s\n", json_print_parsed);
-        cJSON_Delete(json_string_parsed);
-        free(json_print_parsed);
-        */
-      }
-      
-      for (int i = 0; i < count; i++) {
-        free(array_cmd[i]);
-      }
-      
-      if (!vedis_manager) {
-        _utils_printf(NULL, "Unknown VEDIS DB: %s\n", array_cmd[0]);
+      if (!str) { 
+        for (int i = 0; i < has_char_count + 1; i++) {
+          free(array_cmd[i]);
+        }
         free(buffer);
         return -1;
       }
+      
+      char *token = strtok(str, ":");
+      
+      while (token != NULL && array_cmd_len <= has_char_count) {
+        if (array_cmd_len == 0) { _utils_string_remove_start(buffer, strlen(token)+1); }
+        array_cmd[array_cmd_len] = strdup(_utils_string_trim(token)); 
+        
+        if (array_cmd[array_cmd_len]) { array_cmd_len++; }
+        token = strtok(NULL, ":");
+      }
+      free(str);
+      
+      /*
+      for (int i = 0; i < array_cmd_len; i++) {
+        _utils_printf(NULL, "vedis cmd [%d]: %s\n", i, array_cmd[i]);
+        _utils_printf(NULL, "vedis cmd len [%d]: %d\n", i, strlen(array_cmd[i]));
+      }
+      _utils_printf(NULL, "vedis cmd buffer: %s\n", buffer);
+      */
+      
+      vedis_manager = _managers_vedis_manager_get(vedis_managers, array_cmd[0]);
+      if (vedis_manager) { _utils_string_trim(buffer); }
     } else {
-      vedis_manager = &vedis_managers->managers[0];
+      _utils_string_trim(buffer);
+      if (strcmp(buffer, "list") == 0) { rc = _managers_vedis_list(vedis_managers); }
+      else { vedis_manager = &vedis_managers->managers[0]; }
     }
     
-    rc = _managers_vedis_exec(vedis_manager, _utils_string_trim(buffer), -1, NULL);
-    if (rc == VEDIS_OK) {
-      VedisValue *value;
-      rc = _managers_vedis_exec_result(vedis_manager, &value);
+    if (vedis_manager) {
+      rc = _managers_vedis_exec(vedis_manager, buffer, -1, NULL);
       if (rc == VEDIS_OK) {
-        if (_utils_vedis_parse_value_isok(value)) {
-          _utils_vedis_print_value(value);
-          _utils_vedis_value_destroy(value);
+        VedisValue *value;
+        rc = _managers_vedis_exec_result(vedis_manager, &value);
+        if (rc == VEDIS_OK) {
+          if (_utils_vedis_parse_value_isok(value)) {
+            _utils_vedis_print_value(value);
+            _utils_vedis_value_destroy(value);
+          }
         }
       }
+    } else if (has_char_count > 0 && !vedis_manager) {
+      _utils_printf(NULL, "Unknown VEDIS DB: %s\n", array_cmd[0]);
+      rc = SXERR_UNKNOWN;
     }
     
+    for (int i = 0; i < array_cmd_len; i++) {
+      free(array_cmd[i]);
+    }
     free(buffer);
-    return 0;
+    return rc;
   }
 #endif
 

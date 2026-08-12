@@ -10443,6 +10443,7 @@ VEDIS_PRIVATE const vedis_kv_methods * vedisExportMemKvStorage(void)
 #else
 #include <stdlib.h>
 #endif
+#include <string.h>
 #if defined(VEDIS_ENABLE_THREADS)
 /* SyRunTimeApi: sxmutex.c */
 #if defined(__WINNT__)
@@ -10883,6 +10884,7 @@ static void * MemBackendAlloc(SyMemBackend *pBackend, sxu32 nByte)
 		pBlock = (SyMemBlock *)pBackend->pMethods->xAlloc(nByte);
 		if( pBlock != 0 || pBackend->xMemError == 0 || nRetry > SXMEM_BACKEND_RETRY 
 			|| SXERR_RETRY != pBackend->xMemError(pBackend->pUserData) ){
+        memset(pBlock, 0, nByte);
 				break;
 		}
 		nRetry++;

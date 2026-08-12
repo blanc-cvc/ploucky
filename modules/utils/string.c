@@ -58,7 +58,7 @@ char *_utils_string_remove_at(char *str, int pos, int n) {
   return str;
 }
 
-int _utils_string_has_char(char *str, const char c) {
+int _utils_string_has_char(const char *str, const char c) {
   int len = strlen(str);
   int count = 0;
   for (int i = 0; i < len; i++) {

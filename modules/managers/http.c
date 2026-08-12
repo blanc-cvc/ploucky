@@ -136,7 +136,7 @@ static int request_handler(struct mg_connection *conn, void *cb_data) {
       _globals_app_rc_log(ERR_MANAGERS_HTTP_REQUEST_URI_NOT_HANDLED); return ERR_MANAGERS_HTTP_REQUEST_URI_NOT_HANDLED;
     }
     
-    // maybe generate a C and H file to include a function that returns inlined html (webpack)
+    // maybe generate a H file to include a function that returns inlined html (webpack)
     
     return 0;
 }
