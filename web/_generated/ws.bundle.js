@@ -1,0 +1,1 @@
+(()=>{const onmessage_common=(onmessage_common_e,onmessage_common_cb_fn=!1)=>{};onmessage=onmessage_common})();

@@ -12,6 +12,7 @@
 #include "../utils/print.h"
 #include "../utils/int.h"
 #include "../_libs/cjson/cJSON.h"
+#include "../_generated/web.h"
 
 
 // PRIVATE FUNCTIONS
@@ -28,7 +29,7 @@ void print_request_details(struct mg_connection *conn) {
   }
   _utils_printf(NULL, "---------------------------\n");
 }
-
+// TODO stop using length -1 to send chunks
 int send_http_response(struct mg_connection *conn, int code, const char *content_type, const char *content, long content_length) {
   const char *reason = code == 200 ? "OK" : code == 206 ? "Partial Content" : "Error";
   
@@ -104,9 +105,8 @@ static int request_handler(struct mg_connection *conn, void *cb_data) {
     }
     
     
-    if (strcmp(req_info->local_uri, "/") == 0) {
-      char *msg_chunk_test = "Au commencement de cette longue épopée numérique, alors que les serveurs bourdonnaient d'une activité fébrile sous la chaleur estivale, un développeur curieux décida de tester les limites de son algorithme de transmission de données en créant un flux continu de caractères variés, incluant non seulement les lettres standards de l'alphabet latin comme a, b, c, mais aussi une profusion d'accents typiques de la langue française tels que les é, è, ê, ë, à, â, ä, î, ï, ô, ö, ù, û, ü, ç, ainsi que des ligatures complexes comme le œ et le æ, sans oublier les symboles de ponctuation élaborés et les espaces insécables qui rythment la prose moderne ; il imagina alors une histoire où des nuages de données traversaient des océans de fibres optiques pour atteindre des rivages lointains peuplés de routeurs sages et de commutateurs intelligents, capables de trier les paquets perdus et de retransmettre les fragments oubliés avec une précision chirurgicale, tout en gardant à l'esprit que chaque octet comptait, que chaque caractère accentué prenait deux fois plus de place dans l'encodage UTF-8, et que la moindre erreur de calcul dans la longueur d'un chunk pouvait provoquer l'effondrement de toute la structure de communication, plongeant ainsi des milliers d'utilisateurs dans une confusion numérique totale où les pages web s'afficheraient à moitié, où les flux RSS resteraient incomplets, et où les messages d'erreur cryptiques remplaceraient le contenu tant attendu ; c'est pourquoi il décida d'ajouter encore et encore des mots, des phrases, des propositions subordonnées, des incises, des parenthèses (comme celle-ci qui s'étire pour occuper de l'espace précieux), des tirets, des points de suspension, et même des citations imaginaires de philosophes du web qui auraient prédit l'avènement d'un internet fait entièrement de flux chunkés et de connexions persistantes, où la latence serait une notion oubliée et où la bande passante serait infinie, permettant ainsi le transfert instantané de bibliothèques entières, de films en haute définition, de symphonies numériques et de bases de données colossales, le tout encapsulé dans de simples paquets TCP/IP voyageant à la vitesse de la lumière à travers les continents et les océans, reliant les cultures, les savoirs et les esprits dans une toile mondiale sans précédent, tout cela pour simplement s'assurer que sa fonction de test recevrait bien un bloc de données suffisamment massif pour déclencher la logique de découpage en multiples itérations, vérifiant à chaque étape que les indicateurs is_closing et is_error restaient sereins, prouvant ainsi la robustesse de son implémentation face à l'adversité réseau et aux aléas de la transmission de données sur des infrastructures parfois défaillantes, avant de conclure enfin ce test par l'envoi du chunk de fin tant attendu, signalant au client navigateur que le message était complet, intact, et parfaitement lisible, avec tous ses accents correctement affichés, prouvant ainsi le succès de l'opération et la maîtrise totale de l'encodage UTF-8 dans cet environnement de développement exigeant et complexe.";
-      send_http_response(conn, 200, "text/plain", msg_chunk_test, -1);
+    if (strcmp(req_info->local_uri, "/") == 0) { // WEB_PAGE_HTML
+      send_http_response(conn, 200, "text/html", WEB_PAGE_HTML, -1);
     } else if (strcmp(req_info->local_uri, "/vedis") == 0) {  // GET CMD_LIST from VEDIS
       int rc;
       rc = _managers_vedis_exec(_managers_vedis_manager_get(http_manager->vedis_managers, "memory"), "CMD_LIST", -1, NULL);
@@ -135,9 +135,7 @@ static int request_handler(struct mg_connection *conn, void *cb_data) {
       //send_http_response(conn, _utils_int_get_random(400, 500), "text/plain", "Error", 5);
       _globals_app_rc_log(ERR_MANAGERS_HTTP_REQUEST_URI_NOT_HANDLED); return ERR_MANAGERS_HTTP_REQUEST_URI_NOT_HANDLED;
     }
-    
-    // maybe generate a H file to include a function that returns inlined html (webpack)
-    
+        
     return 0;
 }
 // END OF PRIVATE FUNCTIONS

@@ -38,6 +38,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if ! command -v npm &> /dev/null; then
+  echo "TODO Install nodejs (web bundle)."
+  exit -1
+fi
+cd web && npm run build && cd ..
 
 for file in $(find ./modules -type f); do
   if [ ! -r "$file" ]; then
@@ -74,7 +79,7 @@ else
   DEFINES+=(-DPLOUCKY_ENABLE_VEDIS_CMD)
 fi
 
-CONFORMING="-std=c99 -D_POSIX_C_SOURCE=200809L"
+CONFORMING="-std=c99 -D_POSIX_C_SOURCE=200809L -Wno-overlength-strings"
 $COMPILER $DEBUG -pedantic $CONFORMING ${DEFINES[@]} -o $APPNAME main.c $MODULES $LIBLINK
 
 if [ "$CASE" == "valgrind" ]; then

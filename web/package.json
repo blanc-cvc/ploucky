@@ -1,0 +1,35 @@
+{
+    "name": "ploucky",
+    "version": "0.0.1",
+    "description": "UI",
+    "author": "Florian Blanc",
+    "license": "MIT",
+    "homepage": "",
+    "keywords": [
+        "websocket",
+        "blockchain",
+        "fullstack"
+    ],
+    "scripts": {
+        "install": "npm install --ignore-scripts --no-audit --no-bin-links --no-fund --strict-peer-deps && npm audit signatures",
+        "htmlwebh": "node ./scripts/make.web.h.js",
+        "wsblobparts": "export NODE_ENV=production FOOSTACK_DEV=no && node ./node_modules/webpack/bin/webpack.js --config-name blobparts && node ./scripts/make.ws.workerblobs.js",
+        "build": "export NODE_ENV=production FOOSTACK_DEV=no && npm run wsblobparts && node ./node_modules/webpack/bin/webpack.js --config-name web && npm run htmlwebh"
+    },
+    "dependencies": {
+        "navigo": "8.11.1",
+        "uuid": "11.1.0"
+    },
+    "devDependencies": {
+        "buffer": "6.0.3",
+        "bufferutil": "4.0.2",
+        "css-loader": "7.1.2",
+        "sass": "1.90.0",
+        "sass-loader": "16.0.5",
+        "style-loader": "4.0.0",
+        "terser-webpack-plugin": "5.3.14",
+        "webpack": "5.101.3",
+        "webpack-cli": "6.0.1",
+        "ws": "8.18.3"
+    }
+}
