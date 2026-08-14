@@ -59,7 +59,7 @@ Command commands[] = {
 };
 void _main_print_cmd_help(void) {
   for (int i = 0; commands[i].command != NULL; i++) {
-    if (strcmp(commands[i].command, "/help") == 0) continue; 
+    if (strcmp(commands[i].command, "/help") == 0) { continue; }
       
     _utils_printf(NULL, "%-25s : %s\n", commands[i].command, commands[i].description);
   }

@@ -3,6 +3,10 @@ set -e
 cd "$(dirname "$0")"
 
 APPNAME=$(basename "$(pwd)")
+BUILDFOLDER="_build"
+if [ ! -d "./${BUILDFOLDER}" ]; then
+    mkdir "./${BUILDFOLDER}"
+fi
 
 CASE=""
 COMPILER="gcc"
@@ -73,22 +77,19 @@ DEFINES=(
 if [ "$CASE" == "build" ]; then
   APPNAME="${APPNAME}_build"
 else
-  APPNAME="${APPNAME}_test"
+  APPNAME="${APPNAME}_run"
   DEFINES+=(-DMG_EXPERIMENTAL_INTERFACES)
   DEFINES+=(-DUSE_SERVER_STATS)
   DEFINES+=(-DPLOUCKY_ENABLE_VEDIS_CMD)
 fi
 
 CONFORMING="-std=c99 -D_POSIX_C_SOURCE=200809L -Wno-overlength-strings"
-$COMPILER $DEBUG -pedantic $CONFORMING ${DEFINES[@]} -o $APPNAME main.c $MODULES $LIBLINK
+$COMPILER $DEBUG -pedantic $CONFORMING ${DEFINES[@]} -o "./${BUILDFOLDER}/${APPNAME}" main.c $MODULES $LIBLINK
 
 if [ "$CASE" == "valgrind" ]; then
-  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$APPNAME "$@" && rm ./$APPNAME
+  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes "./${BUILDFOLDER}/${APPNAME}" "$@"
   #--malloc-fill=0xAA --free-fill=0xBB --log-file=valgrind.log  --show-leak-kinds=all --track-origins=yes --num-callers=40 --verbose 
 elif [ "$CASE" == "run" ]; then
-  ./$APPNAME "$@"
-  if [ -f "$APPNAME" ]; then
-    rm ./$APPNAME
-  fi
+  "./${BUILDFOLDER}/${APPNAME}" "$@"
 fi
 
