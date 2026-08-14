@@ -29,7 +29,7 @@ void print_request_details(struct mg_connection *conn) {
   }
   _utils_printf(NULL, "---------------------------\n");
 }
-// TODO stop using length -1 to send chunks
+
 int send_http_response(struct mg_connection *conn, int code, const char *content_type, const char *content, long content_length) {
   const char *reason = code == 200 ? "OK" : code == 206 ? "Partial Content" : "Error";
   
@@ -58,6 +58,7 @@ int send_http_response(struct mg_connection *conn, int code, const char *content
   if (!is_chunked) {
     mg_write(conn, content, (size_t)content_length);
   } else {
+    _utils_printf(NULL, "Sending as chunks\n");
     size_t chunk_size = 1024;
     size_t offset = 0;
     while (offset < content_length) {
@@ -75,9 +76,9 @@ int send_http_response(struct mg_connection *conn, int code, const char *content
         if (current_len == 0) { _utils_printf("err", "\n\nStrange: Chunk current_len == 0\n\n"); }
       }
       int bytes_sent = mg_send_chunk(conn, content + offset, current_len); // start: content at offset
-      _utils_printf(NULL, "Chunk sent bytes: %d\n", bytes_sent);
-      _utils_printf(NULL, "Chunk sent char len: %d\n", current_len);
-      _utils_printf(NULL, "Chunk offset: %d\n\n", offset);
+      //_utils_printf(NULL, "Chunk sent bytes: %d\n", bytes_sent);
+      //_utils_printf(NULL, "Chunk sent char len: %d\n", current_len);
+      //_utils_printf(NULL, "Chunk offset: %d\n\n", offset);
       if (bytes_sent <= 0) { return -1; }
       offset += current_len;
     }

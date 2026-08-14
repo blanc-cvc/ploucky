@@ -105,10 +105,6 @@ int main(int argc, char* argv[]) { // MAIN
     vedis_managers->managers = calloc(VEDIS_MANAGER_STORE_COUNT_MAX, sizeof(VedisManager)); // 10 VedisManager max !
     if (!vedis_managers->managers) { _globals_app_rc_log(ERR_MANAGERS_VEDIS_CALLOC); return ERR_MANAGERS_VEDIS_CALLOC; } // change/add rc
     
-    // ADD STORES HERE // adjust VEDIS_MANAGER_STORE_COUNT_MAX with the number of stores
-    _managers_vedis_store_add(vedis_managers, NULL, "memory");
-    _managers_vedis_store_add(vedis_managers, "$HOME/.ploucky/db_test", "dbtest");
-    
     
     // MONGOOSE
     HttpManager *http_manager = calloc(1, sizeof(HttpManager));
@@ -120,6 +116,17 @@ int main(int argc, char* argv[]) { // MAIN
     }
     char port_str[6];
     snprintf(port_str, sizeof(port_str), "%d", port);
+    
+    
+    char db_path[256]; // GLOBAL PATH
+    snprintf(db_path, sizeof(db_path), "$HOME/.ploucky/%s", port_str);
+    // ADD STORES HERE // adjust VEDIS_MANAGER_STORE_COUNT_MAX with the number of stores
+    _managers_vedis_store_add(vedis_managers, NULL, "memory");
+    char db_path_test[256]; // PATH BY FILE
+    snprintf(db_path_test, sizeof(db_path_test), "%s/db_test", db_path);
+    _managers_vedis_store_add(vedis_managers, db_path_test, "dbtest");
+    
+    
     
     rc = _managers_http_init(http_manager, vedis_managers, port_str);
     if (rc != OK_MANAGERS_HTTP_INIT) { return rc; }
@@ -196,7 +203,6 @@ int main(int argc, char* argv[]) { // MAIN
             break; // SIG
           }
           
-          //if (!linenoise_line || linenoise_line[0] != '\0') { _utils_printf(NULL, "\n"); }
           is_command_exist = 0;
           linenoiseEditStart(&linenoise_state, -1, -1, linenoise_buf, sizeof(linenoise_buf), ">>> ");
         }
