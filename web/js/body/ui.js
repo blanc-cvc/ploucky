@@ -224,16 +224,17 @@ const post_bottominput_socketio = () => {
 exports.init = () => {
     
     // used to display on DEV but not on PROD: (console is removed by webpack)
-    if (require('../main').IS_FOOSTACK_DEV) {
-        window.console._is_custom = true;
-        window.console.debug = (obj, text = '_text', details_as_text_node = false, background_color = false) => {
-            this.page_main_add('_console', `console.debug: ${text}`, obj, details_as_text_node, background_color);
-        }
-        window.console.log = (obj, text = '_text', details_as_text_node = false, background_color = false) => {
-            this.page_main_add('_console', `console.log: ${text}`, obj, details_as_text_node, background_color);
-        }
-        this.notification_add('Running ploucky as dev mode', 'icon-slash-square', background_color = 'yellow');
+    window.console = {
+      _is_custom: true,
+      debug: (obj, text = '_text', details_as_text_node = false, background_color = false) => {
+          this.page_main_add('_console', `console.debug: ${text}`, obj, details_as_text_node, background_color);
+      },
+      log: (obj, text = '_text', details_as_text_node = false, background_color = false) => {
+          this.page_main_add('_console', `console.log: ${text}`, obj, details_as_text_node, background_color);
+      }
     }
+    this.notification_add('Running ploucky', 'icon-slash-square', background_color = 'yellow');
+    
     
     if (!window.Worker) {
       console.log('No window.Worker available ! UI can lag', 'window.Worker', details_as_text_node = false, background_color = 'orange');

@@ -47,13 +47,11 @@ int send_http_response(struct mg_connection *conn, int code, const char *content
     "HTTP/%s %d %s\r\n"
     "Content-Type: %s; charset=utf-8\r\n"
     "%s"
-    "Connection: %s\r\n"
-    "Cache-Control: no-cache, no-store, must-revalidate\r\n"
-    "Pragma: no-cache\r\n"
-    "Expires: 0\r\n"
-    "\r\n",
+    "Connection: %s\r\n",    
     is_10 ? "1.0" : "1.1", code, reason, content_type, header_chunk_or_len, is_10 ? "close" : "keep-alive"
   );
+  mg_printf(conn, "%s", HTTP_STATIC_HEADERS);
+  mg_printf(conn, "\r\n");
 
   if (!is_chunked) {
     mg_write(conn, content, (size_t)content_length);

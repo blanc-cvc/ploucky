@@ -1,6 +1,5 @@
 
 document.documentElement.classList.remove("noscript");
-exports.IS_FOOSTACK_DEV=!0;
 
 // to test without worker
 //window.Worker = false ;
@@ -190,12 +189,8 @@ exports.check_html_resources = () => {
           ? `;href=/${resource.href.split('/')[resource.href.split('/').length-1]}:[/]${resource.href.split('/').length-1}`
           : ';no-href' ;
       ;
-      const _is_js = (resource.tagName.toLowerCase() === 'script') && resource.id && (resource.id === 'js') && ( this.IS_FOOSTACK_DEV
-        ? (resource.src && (resource.src.split('/')[3] == 'main.js'))
-        : !resource.src ) ;
-      const _is_css = (this.IS_FOOSTACK_DEV ? resource.tagName.toLowerCase() === 'link' : resource.tagName.toLowerCase() === 'style') && resource.id && (resource.id === 'css') && ( this.IS_FOOSTACK_DEV
-        ? (resource.href && (resource.href.split('/')[3] == 'main.css'))
-        : !resource.href ) ;
+      const _is_js = (resource.tagName.toLowerCase() === 'script') && resource.id && (resource.id === 'js') && !resource.src ;
+      const _is_css = resource.tagName.toLowerCase() === 'style' && resource.id && (resource.id === 'css') && !resource.href ;
       if (!_is_js && !_is_css) {
         __body_ui.notification_add(`Unexpected loaded resource: ${_resource_details}`, 'icon-danger', background_color = 'red');
         __body_ui.page_main_add('_console', `Unexpected loaded resource: ${_resource_details}`, resource.innerHTML, details_as_text_node = true, background_color = 'red');
@@ -332,9 +327,7 @@ exports.init_events_restriction = () => {
                   const _messagetextnode = document.createTextNode(_message);
                   (typeof window.console == 'object') && Object.keys(window.console).includes('_is_custom') && window.console._is_custom
                     ? window.console.debug(_message, `ERROR: ${_el_triggered}`, background_color = 'red')
-                    : this.IS_FOOSTACK_DEV
-                      ? document.querySelector('body > main > main > main > ._console').appendChild(_messagetextnode)
-                      : false ;
+                    : false ;
                 }
                 
                 // const _messagetextnode = document.createTextNode(_message);

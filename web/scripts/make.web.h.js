@@ -49,6 +49,8 @@ fs.readFile(htmlfile, 'utf8', (err_read_htmlfile,data_htmlfile) => {
     fs.readFile(cssfile, 'utf8', (err_read_cssfile,data_cssfile) => {
       if (err_read_cssfile) { return console.log(err_read_cssfile) }
       
+      const sha256_jsfile = require('node:crypto').createHash('sha256').update(data_jsfile).digest('base64');
+      const sha256_cssfile = require('node:crypto').createHash('sha256').update(data_cssfile).digest('base64');
       
       data_htmlfile = data_htmlfile.replace(/<!--[\s\S]*?-->/g, '').replace(/>\s+/g, '>').replace(/\s+</g, '<'); // search.brave.com: minify html
       data_htmlfile = data_htmlfile.replace("<script id=\"js\" src=\"/main.js\"></script>", `<script id="js">${data_jsfile}</script>`);
@@ -77,6 +79,23 @@ fs.readFile(htmlfile, 'utf8', (err_read_htmlfile,data_htmlfile) => {
 #ifndef GENERATED_WEB_H
   #define GENERATED_WEB_H
 
+  // https://github.com/helmetjs/helmet
+  const char HTTP_STATIC_HEADERS[] = 
+    "Cache-Control: no-cache, no-store, must-revalidate\\r\\n"
+    "Pragma: no-cache\\r\\n"
+    "Expires: 0\\r\\n"
+    "Content-Security-Policy: default-src 'self'; base-uri 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'self'; img-src 'self' data:; object-src 'none'; script-src 'self' 'sha256-${sha256_jsfile}'; script-src-attr 'none'; style-src 'self' 'sha256-${sha256_cssfile}'; worker-src 'self' blob:\\r\\n"
+    "Cross-Origin-Opener-Policy: same-origin\\r\\n"
+    "Cross-Origin-Resource-Policy: same-origin\\r\\n"
+    "Origin-Agent-Cluster: ?1\\r\\n"
+    "Referrer-Policy: no-referrer\\r\\n"
+    "X-Content-Type-Options: nosniff\\r\\n"
+    "X-DNS-Prefetch-Control: off\\r\\n"
+    "X-Download-Options: noopen\\r\\n"
+    "X-Frame-Options: DENY\\r\\n"
+    "X-Permitted-Cross-Domain-Policies: none\\r\\n"
+    "X-XSS-Protection: 0\\r\\n";
+  
   const char WEB_PAGE_HTML[] = 
 ${chunks_map};
 

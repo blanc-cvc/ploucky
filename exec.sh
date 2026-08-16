@@ -46,7 +46,11 @@ if ! command -v npm &> /dev/null; then
   echo "TODO Install nodejs (web bundle)."
   exit -1
 fi
-cd web && npm run build && cd ..
+if [ "$CASE" == "build" ]; then
+  cd web && npm run build && cd ..
+else
+  cd web && npm run build-keepconsole && cd ..
+fi
 
 for file in $(find ./modules -type f); do
   if [ ! -r "$file" ]; then
@@ -60,7 +64,15 @@ if [ -z "$MODULES" ]; then
   echo "ERROR: no modules found."
   exit 1
 fi
-echo -e "MODULES :\n${MODULES[@]}\n"
+echo -e "MODULES:\n${MODULES[@]}\n"
+# h files printed as info only
+HFILES=$(find ./modules -type f -name "*.h")
+if [ -z "$HFILES" ]; then
+  echo "ERROR: no h files found."
+  exit 1
+fi
+echo -e "H FILES:\n${HFILES[@]}\n"
+
 
 DEFINES=(
     -DNO_SSL
